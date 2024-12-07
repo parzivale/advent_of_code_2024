@@ -1,7 +1,5 @@
 use std::{
-    fs::File,
-    io::{BufReader, Read},
-    ops::ControlFlow,
+    default, fs::File, io::{BufReader, Read}, ops::ControlFlow
 };
 
 use colored::{ColoredString, Colorize};
@@ -83,20 +81,20 @@ impl Guard {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct Dimensions {
     x: usize,
     y: usize,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct Ground {
     layout: Vec<Vec<char>>,
     dimensions: Dimensions,
     obstacle: Option<(i32, i32)>,
     guard: Guard,
     unique: u32,
-    temp: char,
+    temp: Option<char>,
 }
 
 impl Ground {
@@ -120,13 +118,12 @@ impl Ground {
 
 
     fn move_guard(&mut self) -> ControlFlow<(), Guard> {
-        //println!("Obstacle before move_guard: {:?}", self.obstacle); // Add this line
         let (current_x, current_y) = self.guard.get_position();
         let (x, y) = self.guard.in_front();
         let x_dimensions = self.dimensions.x as i32;
         let y_dimensions = self.dimensions.y as i32;
 
-        if x <= 0 || y <= 0 || x >= x_dimensions || y >= y_dimensions {
+        if x < 0 || y < 0 || x >= x_dimensions || y >= y_dimensions {
             ControlFlow::Break(())
         } else {
             let c = self.get_character_at(x as usize, y as usize).to_owned();
@@ -231,27 +228,31 @@ impl Ground {
 
     pub fn increment_obstacle(&mut self) -> ControlFlow<()> {
         let (x, y) = self.obstacle.unwrap();
-        self.layout[y as usize][x as usize] = self.temp;
+        self.layout[y as usize][x as usize] = self.temp.unwrap_or('.');
 
         if x + 1 >= self.dimensions.x as i32 {
             if y + 1 >= self.dimensions.y as i32 {
                 return ControlFlow::Break(());
             } else {
                 self.obstacle = Some((0, y + 1));
-                self.temp = self.get_character_at(0, (y + 1) as usize).to_owned();
+                self.temp = Some(self.get_character_at(0, (y + 1) as usize).to_owned());
                 self.layout[(y + 1) as usize][0] = '@';
             }
         } else {
             self.obstacle = Some((x + 1, y));
-            self.temp = self
+            self.temp = Some(self
                 .get_character_at((x + 1) as usize, y as usize)
-                .to_owned();
+                .to_owned());
             self.layout[y as usize][(x + 1) as usize] = '@';
         }
 
-        //if self.get_character_at(x as usize, y as usize) == &'#' {
-        //    self.increment_obstacle();
-        //}
+        if self.get_character_at(x as usize, y as usize) == &'#' {
+            self.increment_obstacle();
+        }
+
+        if self.guard.get_position() == (x, y) {
+            self.increment_obstacle();
+        }
 
 
 
@@ -297,9 +298,7 @@ fn main() {
             x: layout_width,
         },
         guard: guard.clone(),
-        unique: 0,
-        obstacle: Some((0, 0)),
-        temp: '.',
+        ..Default::default()
     };
 
     println!("{}", ground.run_unqiue());
@@ -313,16 +312,14 @@ fn main() {
             x: layout_width,
         },
         guard: guard.clone(),
-        unique: 0,
         obstacle: Some((0, 0)),
-        temp: '.',
+        ..Default::default()
     };
 
 
 
     let mut count = 0;
     loop {
-
         if let ControlFlow::Break(_) = ground.run() {
             count += 1;
         };
@@ -334,12 +331,6 @@ fn main() {
         };
 
         ground.guard = guard.clone();
-
     }
     println!("{}", count);
-
-
-
-
-
 }
